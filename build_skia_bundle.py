@@ -321,7 +321,7 @@ def copy_libraries(bundle_dir: Path, temp_dir: Path, download_info: Dict) -> Dic
             print(f"Copied {source_lib} to {target_lib}")
 
             # Determine library name without leading lib prefix for artifact naming
-            if target_stem.lower().startswith("lib"):
+            if target_stem.startswith("lib"):
                 display_name = target_stem[3:]
             else:
                 display_name = target_stem
