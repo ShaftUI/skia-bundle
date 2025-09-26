@@ -292,10 +292,8 @@ def copy_libraries(bundle_dir: Path, temp_dir: Path, download_info: Dict) -> Dic
         # Find all library files
         if platform.startswith("windows"):
             lib_files = list(source_dir.rglob("*.lib"))
-            lib_extension = ".lib"
         else:
             lib_files = list(source_dir.rglob("*.a"))
-            lib_extension = ".a"
         
         platform_libraries = []
         
@@ -303,27 +301,35 @@ def copy_libraries(bundle_dir: Path, temp_dir: Path, download_info: Dict) -> Dic
             # Skip certain files that aren't libraries
             if source_lib.name in ["icudtl.dat"]:
                 continue
-                
-            target_lib = platform_dir / source_lib.name
+
+            suffix = source_lib.suffix
+            original_stem = source_lib.stem
+
+            if platform.startswith("windows"):
+                # Ensure Windows libraries have a lib prefix in the filename
+                if original_stem.lower().startswith("lib"):
+                    target_stem = original_stem
+                else:
+                    target_stem = f"lib{original_stem}"
+                target_name = f"{target_stem}{suffix}"
+            else:
+                target_stem = original_stem
+                target_name = source_lib.name
+
+            target_lib = platform_dir / target_name
             shutil.copy2(source_lib, target_lib)
             print(f"Copied {source_lib} to {target_lib}")
-            
-            # Determine library name without extension
-            lib_name = source_lib.stem
-            if platform.startswith("windows"):
-                # Remove 'lib' prefix if present for Windows
-                display_name = lib_name
+
+            # Determine library name without leading lib prefix for artifact naming
+            if target_stem.lower().startswith("lib"):
+                display_name = target_stem[3:]
             else:
-                # Remove 'lib' prefix for Unix systems
-                if lib_name.startswith("lib"):
-                    display_name = lib_name[3:]
-                else:
-                    display_name = lib_name
-            
+                display_name = target_stem
+
             platform_libraries.append({
-                "file_name": source_lib.name,
+                "file_name": target_name,
                 "lib_name": display_name,
-                "is_main": source_lib.name.lower() in ["libskia.a", "skia.lib"]
+                "is_main": display_name.lower() == "skia"
             })
         
         all_libraries[platform] = platform_libraries
