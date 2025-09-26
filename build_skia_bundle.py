@@ -308,9 +308,9 @@ def copy_libraries(bundle_dir: Path, temp_dir: Path, download_info: Dict) -> Dic
             if platform.startswith("windows"):
                 # Ensure Windows libraries have a lib prefix in the filename
                 if original_stem.lower().startswith("lib"):
-                    target_stem = original_stem
+                    target_stem = original_stem[3:]
                 else:
-                    target_stem = f"lib{original_stem}"
+                    target_stem = original_stem
                 target_name = f"{target_stem}{suffix}"
             else:
                 target_stem = original_stem
