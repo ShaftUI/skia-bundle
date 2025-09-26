@@ -85,13 +85,14 @@ jobs:
         fi
     
     - name: Upload artifact for download
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: skia-artifact-bundle-${{ steps.version.outputs.skia_version }}
         path: |
           *.zip
           *.artifactbundle/
         retention-days: 30
+        compression-level: 0
     
     # Only upload to release if this is a release event or manual dispatch with release_tag
     - name: Upload to Release
