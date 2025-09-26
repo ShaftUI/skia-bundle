@@ -1,0 +1,136 @@
+name: Build Skia Artifact Bundle
+
+on:
+  # Trigger on release creation
+  release:
+    types: [created]
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      skia_version:
+        description: 'Skia version to build (e.g., m126-6bfb13368b)'
+        required: false
+        default: 'm126-6bfb13368b'
+      release_tag:
+        description: 'Release tag to upload to (leave empty to create new release)'
+        required: false
+        default: ''
+
+  # Trigger on pushes to main branch for testing
+  push:
+    branches: [ main ]
+    paths:
+      - 'build_skia_bundle.py'
+      - '.github/workflows/build-skia-bundle.yml'
+
+jobs:
+  build-artifact-bundle:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # No additional dependencies needed - script uses only standard library
+    
+    - name: Determine Skia version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.skia_version }}" ]; then
+          SKIA_VERSION="${{ github.event.inputs.skia_version }}"
+        else
+          # Default version or extract from release tag
+          SKIA_VERSION="m126-6bfb13368b"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Try to extract version from release tag (e.g., v1.0.0-m126-6bfb13368b)
+            TAG_VERSION=$(echo "${{ github.event.release.tag_name }}" | grep -oE 'm[0-9]+-[a-f0-9]+' || echo "")
+            if [ -n "$TAG_VERSION" ]; then
+              SKIA_VERSION="$TAG_VERSION"
+            fi
+          fi
+        fi
+        echo "skia_version=$SKIA_VERSION" >> $GITHUB_OUTPUT
+        echo "Building Skia version: $SKIA_VERSION"
+    
+    - name: Build Skia artifact bundle
+      run: |
+        python build_skia_bundle.py \
+          --version "${{ steps.version.outputs.skia_version }}" \
+          --output "skia-${{ steps.version.outputs.skia_version }}.artifactbundle" \
+          --zip
+    
+    - name: List generated files
+      run: |
+        echo "Generated files:"
+        ls -la *.zip *.artifactbundle/ 2>/dev/null || true
+        
+        echo "ZIP file details:"
+        if ls *.zip 1> /dev/null 2>&1; then
+          for zip_file in *.zip; do
+            echo "File: $zip_file"
+            echo "Size: $(ls -lh "$zip_file" | awk '{print $5}')"
+            echo "Contents preview:"
+            unzip -l "$zip_file" | head -20
+            echo ""
+          done
+        fi
+    
+    - name: Upload artifact for download
+      uses: actions/upload-artifact@v3
+      with:
+        name: skia-artifact-bundle-${{ steps.version.outputs.skia_version }}
+        path: |
+          *.zip
+          *.artifactbundle/
+        retention-days: 30
+    
+    # Only upload to release if this is a release event or manual dispatch with release_tag
+    - name: Upload to Release
+      if: |
+        github.event_name == 'release' || 
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.release_tag || github.event.release.tag_name }}
+        files: |
+          *.zip
+        body: |
+          ## Skia Artifact Bundle - Version ${{ steps.version.outputs.skia_version }}
+          
+          This release contains a pre-compiled Skia artifact bundle for Swift Package Manager.
+          
+          ### Supported Platforms
+          - macOS Universal (x86_64 + arm64)
+          - Linux x64
+          - Linux ARM64  
+          - Windows x64
+          
+          ### Usage
+          1. Download the `skia-${{ steps.version.outputs.skia_version }}.artifactbundle.zip` file
+          2. Extract it to your project directory
+          3. Add as a binary target in your `Package.swift`:
+          
+          ```swift
+          .binaryTarget(
+              name: "skia",
+              path: "path/to/skia-${{ steps.version.outputs.skia_version }}.artifactbundle"
+          )
+          ```
+          
+          ### Contents
+          - Complete Skia headers (339+ files)
+          - Pre-compiled binaries for all supported platforms
+          - Swift Package Manager metadata
+          
+          Built from Skia version: `${{ steps.version.outputs.skia_version }}`
+      # env:
+      #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
