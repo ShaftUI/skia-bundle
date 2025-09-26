@@ -68,6 +68,16 @@ jobs:
           --output "skia-${{ steps.version.outputs.skia_version }}.artifactbundle" \
           --zip
     
+    - name: Compute SHA256 checksum
+      id: checksum
+      run: |
+        ZIP_FILE=$(ls skia-*.artifactbundle.zip)
+        SHA256=$(shasum -a 256 "$ZIP_FILE" | awk '{print $1}')
+        echo "ZIP file: $ZIP_FILE"
+        echo "SHA256: $SHA256"
+        echo "zip_file=$ZIP_FILE" >> $GITHUB_OUTPUT
+        echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
     - name: List generated files
       run: |
         echo "Generated files:"
@@ -132,6 +142,11 @@ jobs:
           - Pre-compiled binaries for all supported platforms
           - Swift Package Manager metadata
           
+          ### Checksum
+          ```
+          ${{ steps.checksum.outputs.sha256 }}  ${{ steps.checksum.outputs.zip_file }}
+          ```
+
           Built from Skia version: `${{ steps.version.outputs.skia_version }}`
       # env:
       #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
